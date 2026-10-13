@@ -20,7 +20,7 @@ export const translations = {
       institutions: 'Homes Directory',
       safety: 'Food Safety',
       contact: 'Contact Us',
-      login: 'Sign In',
+      login: 'Login',
       register: 'Register',
       dashboard: 'Dashboard',
       logout: 'Sign Out',

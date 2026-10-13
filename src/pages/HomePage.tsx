@@ -60,10 +60,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectDonation
 
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <button
-                  onClick={() => {
-                    if (currentRole !== 'donor') loginAs('donor');
-                    onNavigate('donorDashboard');
-                  }}
+                  onClick={() => onNavigate('donorDashboard')}
                   className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold rounded-lg shadow-sm transition-colors text-sm flex items-center gap-2 whitespace-nowrap"
                 >
                   <span>{t.donateFoodCta}</span>
@@ -343,7 +340,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectDonation
                   </button>
                   <button
                     onClick={() => {
-                      if (currentRole !== 'institution') loginAs('institution');
                       onSelectDonation(donation.id);
                       onNavigate('institutionDashboard');
                     }}
@@ -469,10 +465,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectDonation
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
             <button
-              onClick={() => {
-                loginAs('donor');
-                onNavigate('donorDashboard');
-              }}
+              onClick={() => onNavigate('donorDashboard')}
               className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-emerald-50 text-emerald-950 font-bold text-xs rounded-lg transition-colors shadow-xs"
             >
               Post Food Donation Now

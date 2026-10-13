@@ -5,9 +5,12 @@ import {
   Bell,
   HeartHandshake,
   Check,
+  LogIn,
+  UserPlus,
+  LayoutDashboard,
+  LogOut,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { UserRole } from '../../types';
 
 interface NavbarProps {
   currentPage: string;
@@ -38,10 +41,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
     setMobileMenuOpen(false);
   };
 
+  const handleLogout = () => {
+    logout();
+    handleNav('home');
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-neutral-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-8 h-16">
+        <div className="flex items-center justify-between gap-6 h-16">
           {/* Zone 1: Single text element Brand wordmark */}
           <button
             onClick={() => handleNav('home')}
@@ -55,8 +63,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
             </span>
           </button>
 
-          {/* Zone 2: 4-5 clean single-line nav links */}
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-neutral-600">
+          {/* Zone 2: Navigation links */}
+          <nav className="hidden lg:flex items-center gap-5 text-sm font-medium text-neutral-600">
             <button
               onClick={() => handleNav('home')}
               className={`hover:text-emerald-700 transition-colors whitespace-nowrap shrink-0 ${
@@ -115,8 +123,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
             </button>
           </nav>
 
-          {/* Zone 3: 1 primary action area + controls */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Zone 3: Action Controls + Prominent Login & Register Links */}
+          <div className="flex items-center gap-2.5 shrink-0">
             {/* Language Selector Toggle */}
             <div className="flex items-center bg-neutral-100 p-0.5 rounded-lg border border-neutral-200 text-xs">
               <button
@@ -143,67 +151,69 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
               </button>
             </div>
 
-            {/* In-app Notification Bell */}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifMenu(!showNotifMenu)}
-                className="relative p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
-                title="Notifications"
-                aria-label="View notifications"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadNotifications.length > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-emerald-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center font-mono">
-                    {unreadNotifications.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Notification Menu */}
-              {showNotifMenu && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-neutral-200 rounded-xl shadow-lg p-3 z-50">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-neutral-100">
-                    <span className="text-xs font-semibold text-neutral-900">Notifications</span>
-                    <span className="text-[11px] text-neutral-500 font-mono">
-                      {unreadNotifications.length} unread
+            {/* In-app Notification Bell (Visible when authenticated) */}
+            {currentUser && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifMenu(!showNotifMenu)}
+                  className="relative p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors"
+                  title="Notifications"
+                  aria-label="View notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadNotifications.length > 0 && (
+                    <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-emerald-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center font-mono">
+                      {unreadNotifications.length}
                     </span>
-                  </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <p className="text-xs text-neutral-400 py-3 text-center">No notifications yet</p>
-                    ) : (
-                      notifications.slice(0, 5).map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={() => {
-                            markNotificationRead(n.id);
-                            if (n.type === 'request') handleNav('donorDashboard');
-                            if (n.type === 'approval') handleNav('institutionDashboard');
-                          }}
-                          className={`p-2 rounded-lg cursor-pointer text-xs transition-colors ${
-                            n.isRead ? 'bg-neutral-50 text-neutral-600' : 'bg-emerald-50/80 text-emerald-950 font-medium'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-neutral-900">{n.title}</span>
-                            <span className="text-[10px] text-neutral-400 font-mono">
-                              {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-neutral-600 mt-0.5 line-clamp-2">{n.message}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+                  )}
+                </button>
 
-            {/* Quick Role Switcher for Seamless Testing */}
-            <div className="relative hidden sm:block">
+                {/* Notification Dropdown */}
+                {showNotifMenu && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white border border-neutral-200 rounded-xl shadow-lg p-3 z-50">
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-neutral-100">
+                      <span className="text-xs font-semibold text-neutral-900">Notifications</span>
+                      <span className="text-[11px] text-neutral-500 font-mono">
+                        {unreadNotifications.length} unread
+                      </span>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <p className="text-xs text-neutral-400 py-3 text-center">No notifications yet</p>
+                      ) : (
+                        notifications.slice(0, 5).map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              markNotificationRead(n.id);
+                              if (n.type === 'request') handleNav('donorDashboard');
+                              if (n.type === 'approval') handleNav('institutionDashboard');
+                            }}
+                            className={`p-2 rounded-lg cursor-pointer text-xs transition-colors ${
+                              n.isRead ? 'bg-neutral-50 text-neutral-600' : 'bg-emerald-50/80 text-emerald-950 font-medium'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-neutral-900">{n.title}</span>
+                              <span className="text-[10px] text-neutral-400 font-mono">
+                                {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 mt-0.5 line-clamp-2">{n.message}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quick Demo Persona Switcher (Allows testing roles easily) */}
+            <div className="relative hidden md:block">
               <button
                 onClick={() => setShowRoleMenu(!showRoleMenu)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-lg transition-colors whitespace-nowrap"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 rounded-lg transition-colors whitespace-nowrap"
                 title="Switch active user role for testing"
               >
                 <span>Role:</span>
@@ -214,14 +224,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                     ? 'Care Home'
                     : currentRole === 'admin'
                     ? 'Admin'
-                    : 'Guest'}
+                    : 'Visitor'}
                 </span>
               </button>
 
               {showRoleMenu && (
-                <div className="absolute right-0 mt-2 w-52 bg-white border border-neutral-200 rounded-xl shadow-lg p-2 z-50 text-xs">
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-neutral-200 rounded-xl shadow-lg p-2 z-50 text-xs">
                   <div className="px-2 py-1 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
-                    Switch Test Persona
+                    Quick Persona Switcher
                   </div>
                   <button
                     onClick={() => {
@@ -266,8 +276,38 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
               )}
             </div>
 
-            {/* Primary Action Button */}
-            {currentUser ? (
+            {/* Clear, Visible Login Link (Present on all pages, near Register) */}
+            <button
+              onClick={() => handleNav('login')}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 border shadow-2xs ${
+                currentPage === 'login'
+                  ? 'text-emerald-950 bg-emerald-100/90 border-emerald-400 ring-2 ring-emerald-300/70'
+                  : 'text-neutral-800 bg-white border-neutral-300 hover:text-emerald-900 hover:border-emerald-400 hover:bg-emerald-50/60'
+              }`}
+              title="Sign in to your account"
+              aria-current={currentPage === 'login' ? 'page' : undefined}
+            >
+              <LogIn className="w-3.5 h-3.5 text-emerald-700" />
+              <span>{t.nav.login}</span>
+            </button>
+
+            {/* Register Button Placed Directly Beside Login */}
+            <button
+              onClick={() => handleNav('register')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex items-center gap-1.5 shadow-2xs ${
+                currentPage === 'register'
+                  ? 'bg-emerald-900 text-white ring-2 ring-emerald-400'
+                  : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+              }`}
+              title="Register as a Food Donor or Care Home"
+              aria-current={currentPage === 'register' ? 'page' : undefined}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>{t.nav.register}</span>
+            </button>
+
+            {/* Dashboard Shortcut (if authenticated) */}
+            {currentUser && (
               <button
                 onClick={() => {
                   if (currentRole === 'donor') handleNav('donorDashboard');
@@ -275,23 +315,30 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                   else if (currentRole === 'admin') handleNav('adminDashboard');
                   else handleNav('login');
                 }}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg transition-colors whitespace-nowrap shadow-xs"
+                className="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg transition-colors whitespace-nowrap"
+                title="Go to role dashboard"
               >
-                {t.nav.dashboard}
+                <LayoutDashboard className="w-3.5 h-3.5 text-emerald-800" />
+                <span>{t.nav.dashboard}</span>
               </button>
-            ) : (
+            )}
+
+            {/* Sign Out (if authenticated) */}
+            {currentUser && (
               <button
-                onClick={() => handleNav('login')}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg transition-colors whitespace-nowrap shadow-xs"
+                onClick={handleLogout}
+                className="hidden sm:block p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                title="Sign Out"
+                aria-label="Sign Out"
               >
-                {t.nav.login}
+                <LogOut className="w-4 h-4" />
               </button>
             )}
 
             {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-neutral-600 hover:text-neutral-900"
+              className="lg:hidden p-2 text-neutral-600 hover:text-neutral-900"
               aria-label="Toggle Navigation Menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -302,52 +349,131 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-neutral-200 bg-white px-4 pt-3 pb-5 space-y-2">
-          <button
-            onClick={() => handleNav('home')}
-            className="block w-full text-left py-2 text-sm font-medium text-neutral-700"
-          >
-            {t.nav.home}
-          </button>
-          <button
-            onClick={() => handleNav('availableFood')}
-            className="block w-full text-left py-2 text-sm font-medium text-neutral-700"
-          >
-            {t.nav.availableFood}
-          </button>
-          <button
-            onClick={() => handleNav('institutions')}
-            className="block w-full text-left py-2 text-sm font-medium text-neutral-700"
-          >
-            {t.nav.institutions}
-          </button>
-          <button
-            onClick={() => handleNav('howItWorks')}
-            className="block w-full text-left py-2 text-sm font-medium text-neutral-700"
-          >
-            {t.nav.howItWorks}
-          </button>
-          <button
-            onClick={() => handleNav('safety')}
-            className="block w-full text-left py-2 text-sm font-medium text-neutral-700"
-          >
-            {t.nav.safety}
-          </button>
-          <button
-            onClick={() => handleNav('about')}
-            className="block w-full text-left py-2 text-sm font-medium text-neutral-700"
-          >
-            {t.nav.about}
-          </button>
-          <button
-            onClick={() => handleNav('contact')}
-            className="block w-full text-left py-2 text-sm font-medium text-neutral-700"
-          >
-            {t.nav.contact}
-          </button>
+        <div className="lg:hidden border-t border-neutral-200 bg-white px-4 pt-3 pb-6 space-y-3">
+          {/* Mobile Login & Register prominent banner */}
+          <div className="grid grid-cols-2 gap-2 pb-3 border-b border-neutral-100">
+            <button
+              onClick={() => handleNav('login')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-bold rounded-lg border transition-colors shadow-2xs ${
+                currentPage === 'login'
+                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400 ring-2 ring-emerald-300/70'
+                  : 'bg-white text-neutral-800 border-neutral-300 hover:bg-neutral-50'
+              }`}
+            >
+              <LogIn className="w-4 h-4 text-emerald-700" />
+              <span>{t.nav.login}</span>
+            </button>
+            <button
+              onClick={() => handleNav('register')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-bold rounded-lg transition-colors shadow-2xs ${
+                currentPage === 'register'
+                  ? 'bg-emerald-900 text-white ring-2 ring-emerald-400'
+                  : 'bg-emerald-700 hover:bg-emerald-800 text-white'
+              }`}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{t.nav.register}</span>
+            </button>
+          </div>
 
+          {/* Navigation Links */}
+          <div className="space-y-1">
+            <button
+              onClick={() => handleNav('home')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg ${
+                currentPage === 'home' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              {t.nav.home}
+            </button>
+            <button
+              onClick={() => handleNav('availableFood')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg ${
+                currentPage === 'availableFood' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              {t.nav.availableFood}
+            </button>
+            <button
+              onClick={() => handleNav('institutions')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg ${
+                currentPage === 'institutions' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              {t.nav.institutions}
+            </button>
+            <button
+              onClick={() => handleNav('howItWorks')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg ${
+                currentPage === 'howItWorks' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              {t.nav.howItWorks}
+            </button>
+            <button
+              onClick={() => handleNav('safety')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg ${
+                currentPage === 'safety' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              {t.nav.safety}
+            </button>
+            <button
+              onClick={() => handleNav('about')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg ${
+                currentPage === 'about' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              {t.nav.about}
+            </button>
+            <button
+              onClick={() => handleNav('contact')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg ${
+                currentPage === 'contact' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              {t.nav.contact}
+            </button>
+            <button
+              onClick={() => handleNav('login')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg flex items-center gap-2 ${
+                currentPage === 'login' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              <LogIn className="w-4 h-4 text-emerald-700" />
+              <span>{t.nav.login}</span>
+            </button>
+            <button
+              onClick={() => handleNav('register')}
+              className={`block w-full text-left py-2 px-2 text-sm font-medium rounded-lg flex items-center gap-2 ${
+                currentPage === 'register' ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'text-neutral-700'
+              }`}
+            >
+              <UserPlus className="w-4 h-4 text-emerald-700" />
+              <span>{t.nav.register}</span>
+            </button>
+          </div>
+
+          {/* If logged in, show Dashboard button */}
+          {currentUser && (
+            <div className="pt-2 border-t border-neutral-100">
+              <button
+                onClick={() => {
+                  if (currentRole === 'donor') handleNav('donorDashboard');
+                  else if (currentRole === 'institution') handleNav('institutionDashboard');
+                  else if (currentRole === 'admin') handleNav('adminDashboard');
+                }}
+                className="w-full py-2.5 px-3 bg-emerald-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Go to {currentRole === 'donor' ? 'Donor' : currentRole === 'institution' ? 'Care Home' : 'Admin'} Dashboard</span>
+              </button>
+            </div>
+          )}
+
+          {/* Test Persona Switcher in Mobile Drawer */}
           <div className="pt-3 border-t border-neutral-200 space-y-2">
-            <div className="text-xs font-semibold text-neutral-500">Switch Role:</div>
+            <div className="text-xs font-semibold text-neutral-500">Quick Test Personas:</div>
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => {
@@ -355,7 +481,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                   handleNav('donorDashboard');
                 }}
                 className={`py-1.5 px-2 text-center rounded text-xs border ${
-                  currentRole === 'donor' ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900' : 'bg-neutral-50'
+                  currentRole === 'donor' ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900' : 'bg-neutral-50 text-neutral-700'
                 }`}
               >
                 Donor
@@ -366,7 +492,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                   handleNav('institutionDashboard');
                 }}
                 className={`py-1.5 px-2 text-center rounded text-xs border ${
-                  currentRole === 'institution' ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900' : 'bg-neutral-50'
+                  currentRole === 'institution' ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900' : 'bg-neutral-50 text-neutral-700'
                 }`}
               >
                 Care Home
@@ -377,21 +503,19 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
                   handleNav('adminDashboard');
                 }}
                 className={`py-1.5 px-2 text-center rounded text-xs border ${
-                  currentRole === 'admin' ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900' : 'bg-neutral-50'
+                  currentRole === 'admin' ? 'bg-emerald-50 border-emerald-500 font-bold text-emerald-900' : 'bg-neutral-50 text-neutral-700'
                 }`}
               >
                 Admin
               </button>
             </div>
+
             {currentUser && (
               <button
-                onClick={() => {
-                  logout();
-                  handleNav('home');
-                }}
-                className="w-full text-center py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded"
+                onClick={handleLogout}
+                className="w-full text-center py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
               >
-                {t.nav.logout}
+                Sign Out ({currentUser.name})
               </button>
             )}
           </div>

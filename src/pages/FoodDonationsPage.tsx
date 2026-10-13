@@ -36,6 +36,7 @@ export const FoodDonationsPage: React.FC<FoodDonationsPageProps> = ({
     currentUser,
     createRequest,
     requests,
+    setAuthNotice,
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,8 +90,14 @@ export const FoodDonationsPage: React.FC<FoodDonationsPageProps> = ({
   });
 
   const handleOpenRequest = (donation: FoodDonation) => {
-    if (currentRole !== 'institution') {
-      loginAs('institution');
+    if (!currentUser) {
+      setAuthNotice('Authentication Required: Please sign in as a registered Care Home (Children’s or Elders’ Home) to request food donations.');
+      onNavigate('login');
+      return;
+    }
+    if (currentUser.role !== 'institution') {
+      alert('Only registered Care Homes (Children’s or Elders’ Homes) can request food donations. Please sign in with an institution account.');
+      return;
     }
     setRequestModalDonation(donation);
     setRequestedPortions(Math.min(25, donation.remainingQuantity));

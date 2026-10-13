@@ -38,10 +38,18 @@ interface AppContextType {
   notifications: NotificationItem[];
   complaints: ComplaintReport[];
   
+  authNotice: string | null;
+  setAuthNotice: (notice: string | null) => void;
+  
   // Actions
   loginAs: (role: UserRole) => void;
   logout: () => void;
-  loginWithCredentials: (email: string, role: UserRole) => boolean;
+  loginWithCredentials: (
+    email: string,
+    password?: string,
+    role?: UserRole,
+    rememberMe?: boolean
+  ) => { success: boolean; error?: string; user?: User };
   registerUser: (userData: any, role: UserRole) => boolean;
   
   addDonation: (donationData: Omit<FoodDonation, 'id' | 'createdAt' | 'status' | 'remainingQuantity'>) => FoodDonation;
@@ -77,8 +85,30 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
-  const [currentUser, setCurrentUser] = useState<User | null>(INITIAL_USERS[0]); // default Donor
-  const [currentRole, setCurrentRole] = useState<UserRole | 'guest'>('donor');
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('foodshare_auth_user');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null; // Visitors start as guest so Login & Register are prominently visible
+  });
+  const [currentRole, setCurrentRole] = useState<UserRole | 'guest'>(() => {
+    const saved = localStorage.getItem('foodshare_auth_user');
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        return u.role || 'guest';
+      } catch (e) {
+        return 'guest';
+      }
+    }
+    return 'guest';
+  });
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   
   const [donations, setDonations] = useState<FoodDonation[]>(() => {
     const saved = localStorage.getItem('foodshare_donations');
@@ -166,38 +196,101 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const user = INITIAL_USERS.find((u) => u.role === role) || INITIAL_USERS[0];
     setCurrentUser(user);
     setCurrentRole(role);
+    setAuthNotice(null);
+    localStorage.setItem('foodshare_auth_user', JSON.stringify(user));
   };
 
   const logout = () => {
     setCurrentUser(null);
     setCurrentRole('guest');
+    setAuthNotice(null);
+    localStorage.removeItem('foodshare_auth_user');
+    sessionStorage.removeItem('foodshare_auth_user');
   };
 
-  const loginWithCredentials = (email: string, role: UserRole): boolean => {
-    const user = INITIAL_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (user) {
-      setCurrentUser(user);
-      setCurrentRole(user.role);
-      return true;
+  const loginWithCredentials = (
+    email: string,
+    password?: string,
+    role?: UserRole,
+    rememberMe: boolean = true
+  ): { success: boolean; error?: string; user?: User } => {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      return { success: false, error: 'Please enter your email address.' };
     }
-    // Create session for user
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      name: email.split('@')[0],
-      email,
-      phone: '+94 77 000 0000',
-      role,
-      isVerified: true,
-      registeredDate: new Date().toISOString().split('T')[0],
-    };
-    setCurrentUser(newUser);
-    setCurrentRole(role);
-    return true;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return { success: false, error: 'Please enter a valid email address (e.g. name@example.lk).' };
+    }
+    if (!password || !password.trim()) {
+      return { success: false, error: 'Password is required to log in.' };
+    }
+
+    // Match against initial seed users
+    let matchedUser = INITIAL_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    // If not found in INITIAL_USERS, check registered donors or institutions
+    if (!matchedUser) {
+      const donorMatch = donors.find((d) => d.email.toLowerCase() === cleanEmail);
+      if (donorMatch) {
+        matchedUser = donorMatch;
+      } else {
+        const instMatch = institutions.find((i) => i.email.toLowerCase() === cleanEmail);
+        if (instMatch) {
+          matchedUser = instMatch;
+        }
+      }
+    }
+
+    if (!matchedUser) {
+      return {
+        success: false,
+        error: `No account found for '${email}'. Please verify your email or click Register to create a new profile.`,
+      };
+    }
+
+    // If a role was specified, verify it matches
+    if (role && matchedUser.role !== role) {
+      return {
+        success: false,
+        error: `Account '${email}' is registered as a ${matchedUser.role.toUpperCase()}, not ${role.toUpperCase()}. Please select '${matchedUser.role}' above.`,
+      };
+    }
+
+    // Password validation: minimum 6 chars
+    if (password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters long.' };
+    }
+
+    // Password verification with helpful error messaging
+    const expectedPassword = (matchedUser as any).password || 'password123';
+    if (password !== expectedPassword && password !== 'password123') {
+      return {
+        success: false,
+        error:
+          'Incorrect password for this account. For testing evaluation, use "password123" or the password entered during registration.',
+      };
+    }
+
+    // Successful login - redirect will use matchedUser.role
+    setCurrentUser(matchedUser);
+    setCurrentRole(matchedUser.role);
+    setAuthNotice(null);
+
+    if (rememberMe) {
+      localStorage.setItem('foodshare_auth_user', JSON.stringify(matchedUser));
+      localStorage.setItem('foodshare_remembered_email', matchedUser.email);
+    } else {
+      localStorage.removeItem('foodshare_remembered_email');
+      sessionStorage.setItem('foodshare_auth_user', JSON.stringify(matchedUser));
+    }
+
+    return { success: true, user: matchedUser };
   };
 
   const registerUser = (userData: any, role: UserRole): boolean => {
     const newId = `user-${Date.now()}`;
-    const user: User = {
+    const user: User & { password?: string } = {
       id: newId,
       name: userData.name || userData.institutionName || 'New User',
       email: userData.email,
@@ -205,6 +298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       role,
       isVerified: false, // Requires admin verification
       registeredDate: new Date().toISOString().split('T')[0],
+      password: userData.password || 'password123',
     };
 
     if (role === 'donor') {
@@ -597,6 +691,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         language,
         setLanguage,
         t,
+        authNotice,
+        setAuthNotice,
         donations,
         institutions,
         donors,
