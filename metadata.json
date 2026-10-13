@@ -1,0 +1,8 @@
+{
+  "name": "FoodShare Lanka",
+  "description": "Food donation and surplus food redistribution platform connecting event hosts and catering donors with registered children's homes and elders' homes across Jaffna District, Sri Lanka.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
