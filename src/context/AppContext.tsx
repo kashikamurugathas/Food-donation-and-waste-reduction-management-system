@@ -21,6 +21,7 @@ import {
 } from '../data/mockData';
 import { calculateDistanceKm, getCoordinatesForArea } from '../utils/geoUtils';
 import { translations, Language } from '../utils/translations';
+import { authApi } from '../services/api';
 
 interface AppContextType {
   currentUser: User | null;
@@ -41,16 +42,19 @@ interface AppContextType {
   authNotice: string | null;
   setAuthNotice: (notice: string | null) => void;
   
-  // Actions
+  // Real Backend Auth Actions
   loginAs: (role: UserRole) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   loginWithCredentials: (
     email: string,
     password?: string,
     role?: UserRole,
     rememberMe?: boolean
-  ) => { success: boolean; error?: string; user?: User };
-  registerUser: (userData: any, role: UserRole) => boolean;
+  ) => Promise<{ success: boolean; error?: string; user?: User; errors?: Record<string, string[]> }>;
+  registerUser: (
+    userData: any,
+    role: UserRole
+  ) => Promise<{ success: boolean; error?: string; user?: User; errors?: Record<string, string[]> }>;
   
   addDonation: (donationData: Omit<FoodDonation, 'id' | 'createdAt' | 'status' | 'remainingQuantity'>) => FoodDonation;
   updateDonation: (id: string, updates: Partial<FoodDonation>) => void;
@@ -192,162 +196,126 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const t = translations[language];
 
+  // On mount: Check real authentication status via /api/auth/me
+  useEffect(() => {
+    const verifyAuth = async () => {
+      const res = await authApi.getMe();
+      if (res.success && res.user) {
+        const u: User = {
+          id: String(res.user.id),
+          name: res.user.name,
+          email: res.user.email,
+          phone: res.user.phone,
+          role: res.user.role,
+          isVerified: Boolean(res.user.is_verified),
+          registeredDate: res.user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+        };
+        setCurrentUser(u);
+        setCurrentRole(u.role);
+      }
+    };
+    verifyAuth();
+  }, []);
+
   const loginAs = (role: UserRole) => {
     const user = INITIAL_USERS.find((u) => u.role === role) || INITIAL_USERS[0];
     setCurrentUser(user);
     setCurrentRole(role);
     setAuthNotice(null);
-    localStorage.setItem('foodshare_auth_user', JSON.stringify(user));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await authApi.logout();
     setCurrentUser(null);
     setCurrentRole('guest');
     setAuthNotice(null);
-    localStorage.removeItem('foodshare_auth_user');
-    sessionStorage.removeItem('foodshare_auth_user');
   };
 
-  const loginWithCredentials = (
+  const loginWithCredentials = async (
     email: string,
     password?: string,
-    role?: UserRole,
+    _role?: UserRole,
     rememberMe: boolean = true
-  ): { success: boolean; error?: string; user?: User } => {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    if (!cleanEmail) {
-      return { success: false, error: 'Please enter your email address.' };
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(cleanEmail)) {
-      return { success: false, error: 'Please enter a valid email address (e.g. name@example.lk).' };
-    }
-    if (!password || !password.trim()) {
-      return { success: false, error: 'Password is required to log in.' };
-    }
+  ): Promise<{ success: boolean; error?: string; user?: User; errors?: Record<string, string[]> }> => {
+    const res = await authApi.login({
+      email,
+      password: password || '',
+      rememberMe,
+    });
 
-    // Match against initial seed users
-    let matchedUser = INITIAL_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
-
-    // If not found in INITIAL_USERS, check registered donors or institutions
-    if (!matchedUser) {
-      const donorMatch = donors.find((d) => d.email.toLowerCase() === cleanEmail);
-      if (donorMatch) {
-        matchedUser = donorMatch;
-      } else {
-        const instMatch = institutions.find((i) => i.email.toLowerCase() === cleanEmail);
-        if (instMatch) {
-          matchedUser = instMatch;
-        }
-      }
-    }
-
-    if (!matchedUser) {
+    if (!res.success || !res.user) {
       return {
         success: false,
-        error: `No account found for '${email}'. Please verify your email or click Register to create a new profile.`,
+        error: res.error || 'Authentication failed. Please verify your credentials.',
+        errors: res.errors,
       };
     }
 
-    // If a role was specified, verify it matches
-    if (role && matchedUser.role !== role) {
-      return {
-        success: false,
-        error: `Account '${email}' is registered as a ${matchedUser.role.toUpperCase()}, not ${role.toUpperCase()}. Please select '${matchedUser.role}' above.`,
-      };
-    }
+    const authenticatedUser: User = {
+      id: String(res.user.id),
+      name: res.user.name,
+      email: res.user.email,
+      phone: res.user.phone,
+      role: res.user.role,
+      isVerified: Boolean(res.user.is_verified),
+      registeredDate: res.user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+    };
 
-    // Password validation: minimum 6 chars
-    if (password.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters long.' };
-    }
-
-    // Password verification with helpful error messaging
-    const expectedPassword = (matchedUser as any).password || 'password123';
-    if (password !== expectedPassword && password !== 'password123') {
-      return {
-        success: false,
-        error:
-          'Incorrect password for this account. For testing evaluation, use "password123" or the password entered during registration.',
-      };
-    }
-
-    // Successful login - redirect will use matchedUser.role
-    setCurrentUser(matchedUser);
-    setCurrentRole(matchedUser.role);
+    setCurrentUser(authenticatedUser);
+    setCurrentRole(authenticatedUser.role);
     setAuthNotice(null);
 
-    if (rememberMe) {
-      localStorage.setItem('foodshare_auth_user', JSON.stringify(matchedUser));
-      localStorage.setItem('foodshare_remembered_email', matchedUser.email);
-    } else {
-      localStorage.removeItem('foodshare_remembered_email');
-      sessionStorage.setItem('foodshare_auth_user', JSON.stringify(matchedUser));
-    }
-
-    return { success: true, user: matchedUser };
+    return { success: true, user: authenticatedUser };
   };
 
-  const registerUser = (userData: any, role: UserRole): boolean => {
-    const newId = `user-${Date.now()}`;
-    const user: User & { password?: string } = {
-      id: newId,
-      name: userData.name || userData.institutionName || 'New User',
+  const registerUser = async (
+    userData: any,
+    role: UserRole
+  ): Promise<{ success: boolean; error?: string; user?: User; errors?: Record<string, string[]> }> => {
+    const payload = {
+      name: userData.name || userData.institution_name || userData.institutionName,
       email: userData.email,
       phone: userData.phone,
-      role,
-      isVerified: false, // Requires admin verification
-      registeredDate: new Date().toISOString().split('T')[0],
-      password: userData.password || 'password123',
+      password: userData.password,
+      password_confirmation: userData.password_confirmation || userData.password,
+      role: role as 'donor' | 'institution',
+      donor_type: userData.organizationType || userData.donor_type || 'Wedding Hall',
+      venue_name: userData.name || userData.venue_name,
+      address: userData.address,
+      area: userData.area || 'Nallur',
+      district: userData.district || 'Jaffna',
+      institution_name: userData.institution_name || userData.institutionName || userData.name,
+      institution_type: userData.institutionType || userData.institution_type || "Children's Home",
+      registration_number: userData.registrationNumber || userData.registration_number,
+      contact_person: userData.contactPerson || userData.contact_person || userData.name,
+      resident_count: Number(userData.residentCount || userData.resident_count) || 30,
     };
 
-    if (role === 'donor') {
-      const newDonor: DonorProfile = {
-        ...user,
-        organizationType: userData.organizationType || 'Wedding Hall',
-        address: userData.address || 'Jaffna',
-        area: userData.area || 'Nallur',
-        district: 'Jaffna',
-        contactPerson: userData.contactPerson || userData.name,
+    const res = await authApi.register(payload);
+
+    if (!res.success || !res.user) {
+      return {
+        success: false,
+        error: res.error || 'Registration failed. Please check the provided information.',
+        errors: res.errors,
       };
-      setDonors((prev) => [newDonor, ...prev]);
-    } else if (role === 'institution') {
-      const coords = getCoordinatesForArea(userData.area || 'Jaffna Town');
-      const newInst: InstitutionProfile = {
-        ...user,
-        institutionType: userData.institutionType || "Children's Home",
-        registrationNumber: userData.registrationNumber || `DSW/NP/JAF/${Date.now().toString().slice(-4)}`,
-        address: userData.address || 'Jaffna',
-        area: userData.area || 'Jaffna Town',
-        district: 'Jaffna',
-        residentCount: Number(userData.residentCount) || 30,
-        dietaryPreferences: userData.dietaryPreferences || ['Pure Vegetarian Preferred'],
-        operatingHours: userData.operatingHours || '08:00 AM - 08:00 PM',
-        contactPerson: userData.contactPerson || userData.name,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        needsDelivery: !!userData.needsDelivery,
-        notes: userData.notes || 'Newly registered institution awaiting verification.',
-      };
-      setInstitutions((prev) => [newInst, ...prev]);
     }
 
-    setCurrentUser(user);
-    setCurrentRole(role);
-
-    // Notify Admin of new registration
-    const notif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      recipientId: 'admin',
-      title: 'New Account Pending Verification',
-      message: `${user.name} registered as a ${role}. Review their verification details.`,
-      type: 'info',
-      isRead: false,
-      createdAt: new Date().toISOString(),
+    const registeredUser: User = {
+      id: String(res.user.id),
+      name: res.user.name,
+      email: res.user.email,
+      phone: res.user.phone,
+      role: res.user.role,
+      isVerified: Boolean(res.user.is_verified),
+      registeredDate: res.user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
     };
-    setNotifications((prev) => [notif, ...prev]);
 
-    return true;
+    setCurrentUser(registeredUser);
+    setCurrentRole(registeredUser.role);
+    setAuthNotice(null);
+
+    return { success: true, user: registeredUser };
   };
 
   const addDonation = (
